@@ -1,0 +1,52 @@
+{
+  "api": 1,
+  "min_core": "0.2.0",
+  "name": "Cometa",
+  "version": "0.1.0",
+  "author": "FranjeGueje",
+  "description": "Show the achievements of GOG games run through Comet as Steam notifications.",
+  "order": 40,
+  "tab": "Cometa",
+  "settings": [
+    {
+      "key": "enabled",
+      "type": "toggle",
+      "label": "Active",
+      "default": true,
+      "hint": "Turns the web service on or off. It listens on 127.0.0.1 only: programs on this machine can send notifications, nothing else on the network can."
+    },
+    {
+      "key": "port",
+      "type": "number",
+      "label": "Port",
+      "min": 1024,
+      "max": 65535,
+      "default": 33812,
+      "hint": "Where the service listens: http://127.0.0.1:<port>/cometa. Turn the service off to change it.",
+      "disabled_when": {
+        "enabled": true
+      }
+    },
+    {
+      "key": "dnd",
+      "type": "toggle",
+      "label": "Do not disturb",
+      "default": false,
+      "hint": "Requests are still received and answered, but nothing is shown on Steam. The test button still works."
+    },
+    {
+      "key": "endpoint_comet",
+      "type": "toggle",
+      "label": "Comet — /cometa",
+      "default": true,
+      "hint": "Achievements sent by Comet itself (its custom_event setting). The usual method. Off: requests are answered, but nothing is shown."
+    },
+    {
+      "key": "endpoint_comet_db",
+      "type": "toggle",
+      "label": "Comet, old method (by db) — /cometa/db",
+      "default": false,
+      "hint": "An alternative way to catch the same achievements, the old one: Comety reads Comet's database while a GOG game runs. Turn it on only if /cometa doesn't work: with both on, an achievement shows twice."
+    }
+  ]
+}
