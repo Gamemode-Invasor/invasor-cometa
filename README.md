@@ -25,6 +25,8 @@ When the game starts, Cometa checks that the config has that URL, that the game'
 
 When `/cometa/db` is on, Cometa runs **Comety** (`bin/comety`, x86-64; its source is in [`comety/`](comety/)) for each `gameplay.db` of the game being played. Turn it on only if `/cometa` doesn't work: with both on, an achievement shows twice.
 
+The **Achievements** tab shows the achievements Comet keeps for the current GOG game (the open page, else the highlighted tile, else the game being played), one list per `gameplay.db` of its prefix (grouped only when there is more than one): unlocked and locked, with their description, rarity and when they were unlocked. Hidden achievements you don't have yet stay hidden unless you turn on "Show hidden achievements". **Filter** (←→) shows all of them, only the unlocked or only the locked. In Quick Access, Cometa only shows while a GOG game is being played.
+
 ## Build, test and install
 With the core checked out next to this repository (`../invasor`):
 

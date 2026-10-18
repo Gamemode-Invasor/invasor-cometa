@@ -9,8 +9,9 @@ Each endpoint is told when it starts and stops (endpoints.Endpoint), and can ann
 """
 import threading
 
+from . import achievements as achievements_mod
 from . import endpoints as endpoints_mod
-from . import service
+from . import games, service
 
 ctx = None
 server = None
@@ -160,4 +161,17 @@ def test():
     return True
 
 
-METHODS = {"status": status, "recent": recent, "test": test}
+def is_gog(appid):
+    """Whether the game is a GOG one, so it runs Comet: a shortcut whose .bat says set "STORE=gog"."""
+    return games.is_gog_launcher(ctx.game.shortcut_exe(appid))
+
+
+def achievements(appid):
+    """The achievements Comet keeps for the game, one entry per gameplay.db: {"gog": False} if it isn't a GOG
+    game."""
+    if not is_gog(appid):
+        return {"gog": False}
+    return {"gog": True, "dbs": [achievements_mod.read(db) for db in games.gameplay_dbs(appid)]}
+
+
+METHODS = {"status": status, "recent": recent, "test": test, "achievements": achievements, "is_gog": is_gog}
