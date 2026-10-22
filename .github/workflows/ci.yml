@@ -16,3 +16,9 @@ jobs:
   module:
     uses: Gamemode-Invasor/invasor/.github/workflows/module.yml@main
     secrets: inherit
+
+  comety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C comety

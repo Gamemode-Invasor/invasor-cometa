@@ -35,4 +35,4 @@ make                                  # static `comety` (and `comety.no-static`)
 cp comety ../cometa/bin/comety        # the one Cometa packs
 ```
 
-The same source and toolchain give the same binary. x86-64 only, as built here.
+The same source and toolchain give the same binary. x86-64 only, as built here. CI builds it on every push to main and every pull request, so a change that breaks it shows up there.
