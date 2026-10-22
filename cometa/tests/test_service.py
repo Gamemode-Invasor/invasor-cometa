@@ -9,7 +9,7 @@ import unittest
 import zlib
 from pathlib import Path
 
-from tests.loader import load_backend, submodule
+from tests.loader import load_backend
 
 BACKEND = load_backend()
 service = BACKEND.service
