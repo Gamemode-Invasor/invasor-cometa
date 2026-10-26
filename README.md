@@ -51,7 +51,7 @@ python3 ../invasor/tools/install_module.py cometa    # or install that zip from 
 
 ## Changes
 
-### Unreleased
+### 0.2.0
 - A GOG game in another library (an SD card, a USB drive) is found too: its Comet config, its databases and its achievements. Before, only the main library was looked at.
 - Needs Invasor 0.3.0.
 
