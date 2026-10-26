@@ -1,25 +1,29 @@
-"""Finding Comet's databases and a game's logo on disk. Pure stdlib, no Invasor imports."""
+"""Finding Comet's databases and a game's logo on disk. Pure stdlib, no Invasor imports: backend.py passes Steam's
+folders in (from ctx.paths)."""
 import os
 import re
 from pathlib import Path
 
-STEAM = Path.home() / ".local/share/Steam"
 LOGO_TYPES = (".png", ".jpg", ".jpeg", ".webp")
 
 
-def gameplay_dbs(appid, steam=STEAM):
-    """Every gameplay.db Comet keeps for the game, in the subfolders of its gameplay folder."""
-    base = (Path(steam) / "steamapps" / "compatdata" / str(appid) / "pfx" / "drive_c" / "users" / "steamuser"
-            / "AppData" / "Local" / "comet" / "gameplay")
+STEAMUSER = Path("pfx/drive_c/users/steamuser")
+
+
+def gameplay_dbs(prefix):
+    """Every gameplay.db Comet keeps for the game, in the subfolders of its gameplay folder. `prefix` is the game's
+    compatdata folder, in whichever library holds it."""
+    base = Path(prefix) / STEAMUSER / "AppData/Local/comet/gameplay"
     return sorted(str(p) for p in base.glob("*/**/gameplay.db") if p.is_file())
 
 
-def logo_files(appid, steam=STEAM):
-    """The game's logo images, best first: the one set by the user, then Steam's own."""
-    steam, found = Path(steam), []
+def logo_files(appid, steam_root, accounts):
+    """The game's logo images, best first: the one set by the user (in any of the `accounts`, Steam's userdata/<id>
+    folders), then Steam's own."""
+    found = []
     for ext in LOGO_TYPES:
-        found += sorted(steam.glob(f"userdata/*/config/grid/{appid}_logo{ext}"))
-    found.append(steam / "appcache" / "librarycache" / str(appid) / "logo.png")
+        found += sorted(Path(a) / "config" / "grid" / f"{appid}_logo{ext}" for a in accounts)
+    found.append(Path(steam_root) / "appcache" / "librarycache" / str(appid) / "logo.png")
     return [str(p) for p in found if p.is_file()]
 
 
@@ -28,10 +32,9 @@ STORE_GOG = re.compile(r'^\s*set\s+"?STORE=gog"?\s*$', re.IGNORECASE | re.MULTIL
 MAX_LAUNCHER = 64 * 1024
 
 
-def comet_config(appid, steam=STEAM):
-    """Comet's config.toml in the game's prefix. Comet reads it once, when it starts."""
-    return (Path(steam) / "steamapps" / "compatdata" / str(appid) / "pfx" / "drive_c" / "users" / "steamuser"
-            / "AppData" / "Roaming" / "comet" / "config.toml")
+def comet_config(prefix):
+    """Comet's config.toml in the game's prefix (its compatdata folder). Comet reads it once, when it starts."""
+    return Path(prefix) / STEAMUSER / "AppData/Roaming/comet/config.toml"
 
 
 def is_gog_launcher(path):

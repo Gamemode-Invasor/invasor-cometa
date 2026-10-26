@@ -15,7 +15,8 @@ def client_id(db_path):
     return os.path.basename(os.path.dirname(os.path.dirname(db_path)))
 
 
-def _https(url):
+def https_url(url):
+    """url if it is an https:// one, else "" (Steam only shows https images)."""
     return url if isinstance(url, str) and url.startswith("https://") else ""
 
 
@@ -39,7 +40,7 @@ def read(db_path):
         found.append({
             "key": key, "name": name or key, "description": description or "", "hidden": not visible,
             "unlocked": unlocked, "rarity": float(rarity or 0), "rarity_level": level or "",
-            "image": _https(unlocked_url) if unlocked else _https(locked_url),
+            "image": https_url(unlocked_url) if unlocked else https_url(locked_url),
         })
     # unlocked first, the latest first (Comet's ISO times sort as text); then locked, the most common first
     unlocked = sorted((a for a in found if a["unlocked"]), key=lambda a: a["unlocked"], reverse=True)

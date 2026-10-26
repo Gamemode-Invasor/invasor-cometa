@@ -1,6 +1,6 @@
 # Cometa
 
-A module for [Invasor](../invasor) that shows the **achievements of GOG games run through [Comet](https://github.com/imLinguin/comet)** as Steam notifications, in Game Mode and Big Picture. A child module of [Noty](https://github.com/Gamemode-Invasor/invasor-noty).
+A module for [Invasor](../invasor) that shows the **achievements of GOG games run through [Comet](https://github.com/imLinguin/comet)** as Steam notifications, in Game Mode and Big Picture. Split from Noty, together with [Popy](https://github.com/Gamemode-Invasor/invasor-popy).
 
 Cometa listens on **127.0.0.1** only (port 33812 by default; turn the service off in its tab to change it). Each endpoint can be turned off in the tab.
 
@@ -27,6 +27,20 @@ When `/cometa/db` is on, Cometa runs **Comety** (`bin/comety`, x86-64; its sourc
 
 The **Achievements** tab shows the achievements Comet keeps for the current GOG game (the open page, else the highlighted tile, else the game being played), one list per `gameplay.db` of its prefix (grouped only when there is more than one): unlocked and locked, with their description, rarity and when they were unlocked. Hidden achievements you don't have yet stay hidden unless you turn on "Show hidden achievements". **Filter** (←→) shows all of them, only the unlocked or only the locked. In Quick Access, Cometa only shows while a GOG game is being played.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/toast.png" alt="A GOG achievement shown as a Steam notification" width="60%">
+</p>
+
+<p align="center">
+  <img src="docs/general.png" alt="General page: the service and its endpoints" width="48%">
+  <img src="docs/achievements.png" alt="Achievements page of a GOG game" width="48%">
+</p>
+
+## Requirements
+Invasor 0.3.0 or newer (`min_core`): it uses `ctx.paths` to find a game's prefix in whichever library holds it.
+
 ## Build, test and install
 With the core checked out next to this repository (`../invasor`):
 
@@ -36,6 +50,10 @@ python3 ../invasor/tools/install_module.py cometa    # or install that zip from 
 ```
 
 ## Changes
+
+### Unreleased
+- A GOG game in another library (an SD card, a USB drive) is found too: its Comet config, its databases and its achievements. Before, only the main library was looked at.
+- Needs Invasor 0.3.0.
 
 ### 0.1.0
 - First release.

@@ -70,6 +70,9 @@ class FakeCtx:
         self.shown, self.bodies, self.icons, self.sounds = [], [], [], []
         self.game = types.SimpleNamespace(running=None, selected=None, shortcut_exe=lambda appid: None)
         self.events = FakeEvents()
+        self.paths = types.SimpleNamespace(  # Steam's folders as ctx.paths gives them (a game's prefix in a 2nd library)
+            compatdata=lambda appid: f"/sd/steamapps/compatdata/{appid}", steam_root=lambda: "/steam",
+            userdata=lambda all=False: ["/steam/userdata/1"])
 
     def stop_game(self):
         """The game being played ends: running goes, and the core sends game_stopped."""
@@ -84,6 +87,20 @@ class FakeCtx:
 
 
 class Backend(unittest.TestCase):
+    def test_host_finds_steam_s_folders_with_ctx_paths(self):
+        b = load_backend()
+        ctx = FakeCtx(free_port())
+        host = b.Host(ctx)
+        self.assertEqual(host.prefix("123"), "/sd/steamapps/compatdata/123")
+        with mock.patch.object(submodule(b, "games"), "logo_files", return_value=["/x.png"]) as files:
+            self.assertEqual(host.logos("123"), ["/x.png"])
+            files.assert_called_with("123", "/steam", ["/steam/userdata/1"])
+
+        def no_steam():
+            raise Unavailable("Steam's folder wasn't found")
+        ctx.paths.steam_root = no_steam
+        self.assertEqual(host.logos("123"), [])  # no logo, no error
+
     def test_lifecycle(self):
         b = load_backend()
         ctx = FakeCtx(free_port())
@@ -154,7 +171,7 @@ class Backend(unittest.TestCase):
         self.assertEqual([c.args[0][1:] for c in popen.call_args_list],
                          [["--url", url, "--quiet", "/a/gameplay.db"], ["--url", url, "--quiet", "/b/gameplay.db"]])
         chmod.assert_called_with(comet.COMETY_BIN, 0o755)
-        comet.games.gameplay_dbs.assert_called_with("123")
+        comet.games.gameplay_dbs.assert_called_with("/sd/steamapps/compatdata/123")  # the library that holds the game
         self.assertEqual(self.details(b), ["● Comety: /a/gameplay.db", "● Comety: /b/gameplay.db"])
         self.assertEqual((ctx.shown, ctx.bodies), (["Comet - Lil Gator Game"], ["Cometa is connecting to Lil Gator Game"]))
         self.assertEqual(ctx.sounds, ["online"])
@@ -390,7 +407,7 @@ class Comet(unittest.TestCase):
     def test_selecting_a_gog_game_sets_the_config_with_cometa_s_port(self):
         self.ctx.events.emit("game_selected", self.GAME)
         self.assertIn(f'url = "{self.url}"', self.written())
-        self.gog.games.comet_config.assert_called_with("123")
+        self.gog.games.comet_config.assert_called_with("/sd/steamapps/compatdata/123")
         self.ctx.game.shortcut_exe.assert_called_with("123")
 
     def test_other_games_are_left_alone(self):
