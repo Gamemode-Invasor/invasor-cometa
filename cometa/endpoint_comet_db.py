@@ -1,54 +1,22 @@
 """/cometa/db: Comet's (GOG) unlocked achievements.
 
-Comet keeps each game's achievements in a SQLite database (gameplay.db). While this endpoint is on,
-Cometa follows the game being played (Invasor's game_started / game_stopped events) and, for each database Comet keeps for it, runs Comety
-(bin/comety), which POSTs every new unlock to this endpoint. Its messages are about the game:
-"connecting to" it when the databases are found, "disconnected" when it ends.
+Comet keeps each game's achievements in a SQLite database (gameplay.db). While this endpoint is on, Cometa follows
+the game being played (Invasor's game_started / game_stopped events) and, for each database Comet keeps for it, runs
+Comety (bin/comety), which POSTs every new unlock to this endpoint. Its messages are about the game: "connecting to"
+it when the databases are found, "disconnected" when it ends.
 """
 import os
 import subprocess
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
 
 from . import games, service
-from .endpoints import Endpoint
+from .endpoints import Endpoint, just_unlocked, logo, trophy
 
 COMETY_BIN = Path(__file__).resolve().parent / "bin" / "comety"
 # After a game starts, look for its databases (Comet creates them late): the first time after
 # 5 s, and while there are none, again after 10 s and after 15 s more. Then it gives up.
 GAME_WAITS = (5.0, 10.0, 15.0)
-MAX_UNLOCK_AGE = 300  # seconds: an older unlock is Comet syncing what you had, not something new
-
-
-def just_unlocked(unlock_time):
-    """Whether Comet's unlock_time ("2026-07-31T01:48:51+0000") is recent. Comety sends every
-    update of an achievement, including a new database being filled with what you already had."""
-    try:
-        when = datetime.strptime(unlock_time, "%Y-%m-%dT%H:%M:%S%z")
-    except (TypeError, ValueError):
-        return False
-    return (datetime.now(timezone.utc) - when).total_seconds() <= MAX_UNLOCK_AGE
-
-
-def logo(appid):
-    """The game's logo as a data: URI, or "" if it has none (that fits)."""
-    for path in games.logo_files(appid):
-        try:
-            return service.icon_from_file(path)
-        except service.Rejected:
-            continue  # too big, or not an image: the next one
-    return ""
-
-
-def trophy(name, description, rarity, image_url):
-    """An unlocked achievement as (title, body, icon, sound): the description and the rarity as the body, the
-    https:// image as the icon, always the trophy sound."""
-    body = description if isinstance(description, str) else ""
-    if isinstance(rarity, (int, float)) and not isinstance(rarity, bool):
-        body = f"{body} · {rarity:.1f}%" if body else f"{rarity:.1f}%"
-    return name, body, image_url if isinstance(image_url, str) and image_url.startswith("https://") else "", "trophy"
-
 
 class CometDb(Endpoint):
     name = "comet_db"
@@ -62,7 +30,6 @@ class CometDb(Endpoint):
         self.game = None  # (appid, name) once connected to it
         self._current = None  # appid of the game being followed (connected or still looking)
         self._cancel = threading.Event()  # ends the search for _current's databases
-        self._registered = False
         self._lock = threading.Lock()
         self._stop = threading.Event()
 
@@ -76,26 +43,17 @@ class CometDb(Endpoint):
         return trophy(data["name"], data.get("description"), data.get("rarity"), data.get("image_url_unlocked"))
 
     def start(self, host):
-        if self._registered:
+        if self.listening:
             return
         self.host = host
         self._stop.clear()
-        events = host.ctx.events
-        events.on("game_started", self._game_started)
-        events.on("game_stopped", self._game_stopped)
-        self._registered = True
+        self._listen(host, {"game_started": self._game_started, "game_stopped": self._game_stopped})
         running = host.ctx.game.running  # turned on in the middle of a game: the event already passed
         if running:
             self._begin(running)
 
     def stop(self):
-        if self._registered:
-            self._registered = False
-            for name, cb in (("game_started", self._game_started), ("game_stopped", self._game_stopped)):
-                try:
-                    self.host.ctx.events.off(name, cb)
-                except Exception:
-                    self.host.log.exception("can't stop listening to %s", name)
+        self._unlisten()
         self._stop.set()
         self._cancel.set()
         with self._lock:
@@ -156,7 +114,8 @@ class CometDb(Endpoint):
             self._run(dbs)
             if first:
                 self.game = (appid, name)
-                self.host.announce(self, f"Comet - {name}", f"Cometa is connecting to {name}", logo(appid), sound="online")
+                self.host.announce(self, f"Comet - {name}", f"Cometa is connecting to {name}",
+                                   logo(self.host.logos(appid)), sound="online")
 
     def _leave(self):
         """The game is over (or the endpoint is turned off): stop its comety and say so."""
@@ -165,7 +124,8 @@ class CometDb(Endpoint):
             self._stop_comety()
             self.comety.clear()
             if game:
-                self.host.announce(self, f"Comet - {game[1]}", f"Cometa disconnected from {game[1]}", logo(game[0]), sound="mention")
+                self.host.announce(self, f"Comet - {game[1]}", f"Cometa disconnected from {game[1]}",
+                                   logo(self.host.logos(game[0])), sound="mention")
 
     # -- the game being played --
 
@@ -203,7 +163,7 @@ class CometDb(Endpoint):
             for attempt, wait in enumerate(GAME_WAITS, 1):
                 if cancel.wait(wait) or self._stop.is_set():
                     return
-                dbs = games.gameplay_dbs(appid)
+                dbs = games.gameplay_dbs(self.host.prefix(appid))
                 if dbs:
                     self._connect(appid, name, dbs, cancel)
                     return

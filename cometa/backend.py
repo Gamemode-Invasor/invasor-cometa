@@ -27,6 +27,17 @@ class Host:
     def __init__(self, context):
         self.ctx, self.log = context, context.log
 
+    def prefix(self, appid):
+        """The game's compatdata folder, in whichever library holds it (ctx.paths)."""
+        return self.ctx.paths.compatdata(appid)
+
+    def logos(self, appid):
+        """The game's logo images, best first; [] if Steam's folders can't be found."""
+        try:
+            return games.logo_files(appid, self.ctx.paths.steam_root(), self.ctx.paths.userdata(all=True))
+        except (self.ctx.InvalidArgument, self.ctx.Unavailable):
+            return []
+
     @property
     def port(self):
         return server.port if server else None
@@ -61,14 +72,20 @@ def _stop_endpoints():
             ctx.log.exception("%s: stopping failed", ep.name)
 
 
+def _stop_service():
+    """Stop the endpoints and the web service (with _lock held)."""
+    global server
+    _stop_endpoints()
+    if server:
+        server.stop()
+        server = None
+
+
 def _start():
     """(Re)start the service with the current settings. Never raises."""
     global server, error
     with _lock:
-        _stop_endpoints()
-        if server:
-            server.stop()
-            server = None
+        _stop_service()
         error = None
         if not ctx.settings.get("enabled"):
             return
@@ -128,12 +145,8 @@ def setup(context):
 
 
 def teardown():
-    global server
     with _lock:
-        _stop_endpoints()
-        if server:
-            server.stop()
-            server = None
+        _stop_service()
 
 
 def status():
@@ -171,7 +184,7 @@ def achievements(appid):
     game."""
     if not is_gog(appid):
         return {"gog": False}
-    return {"gog": True, "dbs": [achievements_mod.read(db) for db in games.gameplay_dbs(appid)]}
+    return {"gog": True, "dbs": [achievements_mod.read(db) for db in games.gameplay_dbs(ctx.paths.compatdata(appid))]}
 
 
 METHODS = {"status": status, "recent": recent, "test": test, "achievements": achievements, "is_gog": is_gog}

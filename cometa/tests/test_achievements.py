@@ -96,8 +96,10 @@ class Backend(unittest.TestCase):
         b.ctx = mock.Mock()
         games = submodule(b, "games")
         with mock.patch.object(games, "is_gog_launcher", return_value=True), \
-                mock.patch.object(games, "gameplay_dbs", return_value=[]):
+                mock.patch.object(games, "gameplay_dbs", return_value=[]) as dbs:
             self.assertEqual(b.achievements("123"), {"gog": True, "dbs": []})
+        b.ctx.paths.compatdata.assert_called_with("123")  # the library that holds the game, not only the main one
+        dbs.assert_called_with(b.ctx.paths.compatdata.return_value)
 
 
 if __name__ == "__main__":

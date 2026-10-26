@@ -5,12 +5,15 @@ into a notification, and what to do when it starts and stops. Subclass Endpoint,
 endpoint_<name>.py, and add it to build(). Its on/off switch is the setting endpoint_<name>
 (module.json).
 """
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
 from . import service
+from .achievements import https_url
 
 ASSETS = Path(__file__).resolve().parent / "assets"
+MAX_UNLOCK_AGE = 300  # seconds: an older unlock is Comet syncing what you had, not something new
 
 
 @lru_cache(maxsize=None)
@@ -20,6 +23,35 @@ def default_icon():
         return service.icon_from_file(ASSETS / "comety.png")
     except service.Rejected:
         return ""
+
+
+def just_unlocked(unlock_time):
+    """Whether Comet's unlock_time ("2026-07-31T01:48:51+0000") is recent. Comety sends every
+    update of an achievement, including a new database being filled with what you already had."""
+    try:
+        when = datetime.strptime(unlock_time, "%Y-%m-%dT%H:%M:%S%z")
+    except (TypeError, ValueError):
+        return False
+    return (datetime.now(timezone.utc) - when).total_seconds() <= MAX_UNLOCK_AGE
+
+
+def logo(files):
+    """The first of the game's logo files (Host.logos) that fits, as a data: URI, or "" if none does."""
+    for path in files:
+        try:
+            return service.icon_from_file(path)
+        except service.Rejected:
+            continue  # too big, or not an image: the next one
+    return ""
+
+
+def trophy(name, description, rarity, image_url):
+    """An unlocked achievement as (title, body, icon, sound): the description and the rarity as the body, the
+    https:// image as the icon, always the trophy sound."""
+    body = description if isinstance(description, str) else ""
+    if isinstance(rarity, (int, float)) and not isinstance(rarity, bool):
+        body = f"{body} · {rarity:.1f}%" if body else f"{rarity:.1f}%"
+    return name, body, https_url(image_url), "trophy"
 
 
 class Endpoint:
@@ -50,6 +82,26 @@ class Endpoint:
     def details(self):
         """Lines for the tab, under the endpoint, while it's on."""
         return []
+
+    # -- Invasor's game events, for the endpoints that follow the games --
+
+    @property
+    def listening(self):
+        return bool(getattr(self, "_handlers", None))
+
+    def _listen(self, host, handlers):
+        """Follow Invasor's events, {name: callback}, until _unlisten()."""
+        self._handlers = handlers
+        for name, cb in handlers.items():
+            host.ctx.events.on(name, cb)
+
+    def _unlisten(self):
+        handlers, self._handlers = getattr(self, "_handlers", None) or {}, {}
+        for name, cb in handlers.items():
+            try:
+                self.host.ctx.events.off(name, cb)
+            except Exception:
+                self.host.log.exception("can't stop listening to %s", name)
 
     def icon_data(self):
         """Its image as a data: URI, or "" if it has none."""

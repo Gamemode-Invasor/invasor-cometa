@@ -28,17 +28,20 @@ class Games(unittest.TestCase):
             touch(root / "steamapps/compatdata/42/pfx/drive_c/users/steamuser" / gp / "111/other.db")
             touch(root / "steamapps/compatdata/42/pfx/drive_c/users/other" / gp / "333/gameplay.db")
             touch(root / "steamapps/compatdata/43/pfx/drive_c/users/steamuser" / gp / "1/gameplay.db")
-            self.assertEqual(games.gameplay_dbs(42, root), sorted([one, two]))
-            self.assertEqual(games.gameplay_dbs(44, root), [])
+            self.assertEqual(games.gameplay_dbs(root / "steamapps/compatdata/42"), sorted([one, two]))
+            self.assertEqual(games.gameplay_dbs(root / "steamapps/compatdata/44"), [])
 
     def test_logo_the_users_first_then_steams(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            self.assertEqual(games.logo_files(7, root), [])
+            accounts = [root / "userdata/1", root / "userdata/2"]
+            self.assertEqual(games.logo_files(7, root, accounts), [])
             steam = touch(root / "appcache/librarycache/7/logo.png")
-            self.assertEqual(games.logo_files(7, root), [steam])
-            mine = touch(root / "userdata/1/config/grid/7_logo.png")
-            self.assertEqual(games.logo_files(7, root), [mine, steam])
+            self.assertEqual(games.logo_files(7, root, accounts), [steam])
+            mine = touch(root / "userdata/2/config/grid/7_logo.png")
+            self.assertEqual(games.logo_files(7, root, accounts), [mine, steam])
+            touch(root / "userdata/3/config/grid/7_logo.png")  # not an account Steam gave
+            self.assertEqual(games.logo_files(7, root, accounts), [mine, steam])
 
 
 if __name__ == "__main__":
@@ -47,8 +50,8 @@ if __name__ == "__main__":
 
 class Comet(unittest.TestCase):
     def test_config_path_is_in_the_roaming_folder_of_the_prefix(self):
-        path = games.comet_config(42, "/steam")
-        self.assertEqual(str(path), "/steam/steamapps/compatdata/42/pfx/drive_c/users/steamuser/AppData/Roaming/comet/config.toml")
+        path = games.comet_config("/sd/steamapps/compatdata/42")
+        self.assertEqual(str(path), "/sd/steamapps/compatdata/42/pfx/drive_c/users/steamuser/AppData/Roaming/comet/config.toml")
 
     def test_gog_launcher(self):
         with tempfile.TemporaryDirectory() as d:

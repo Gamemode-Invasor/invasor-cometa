@@ -12,8 +12,7 @@ checks every few seconds that the config has that URL, that comet.exe is running
 import threading
 
 from . import comet_config, games, service
-from .endpoint_comet_db import just_unlocked, logo, trophy
-from .endpoints import Endpoint
+from .endpoints import Endpoint, just_unlocked, logo, trophy
 
 EVENT = "achievement_unlocked"
 WATCH_WAIT = 5.0   # seconds between checks
@@ -30,7 +29,6 @@ class Comet(Endpoint):
         self.host = None
         self._current = None  # appid of the game being watched
         self._cancel = threading.Event()  # ends the watch of _current
-        self._registered = False
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._state = ""
@@ -50,15 +48,12 @@ class Comet(Endpoint):
                       achievement.get("image_url_unlocked"))
 
     def start(self, host):
-        if self._registered:
+        if self.listening:
             return
         self.host = host
         self._stop.clear()
-        events = host.ctx.events
-        events.on("game_selected", self._game_selected)
-        events.on("game_started", self._game_started)
-        events.on("game_stopped", self._game_stopped)
-        self._registered = True
+        self._listen(host, {"game_selected": self._game_selected, "game_started": self._game_started,
+                            "game_stopped": self._game_stopped})
         # Turned on in the middle of a session: the events already passed.
         selected, running = host.ctx.game.selected, host.ctx.game.running
         if selected:
@@ -67,14 +62,7 @@ class Comet(Endpoint):
             self._begin(running)
 
     def stop(self):
-        if self._registered:
-            self._registered = False
-            for name, cb in (("game_selected", self._game_selected), ("game_started", self._game_started),
-                             ("game_stopped", self._game_stopped)):
-                try:
-                    self.host.ctx.events.off(name, cb)
-                except Exception:
-                    self.host.log.exception("can't stop listening to %s", name)
+        self._unlisten()
         self._stop.set()
         self._cancel.set()
         with self._lock:
@@ -106,7 +94,7 @@ class Comet(Endpoint):
                 return None
             if not games.is_gog_launcher(self.host.ctx.game.shortcut_exe(appid)):
                 return None
-            path = str(games.comet_config(appid))
+            path = str(games.comet_config(self.host.prefix(appid)))
             if comet_config.ensure_block(path, self._url()):
                 self.host.log.info("Comet config of %s set up: %s", game.get("name") or appid, path)
             return path
@@ -181,7 +169,8 @@ class Comet(Endpoint):
                     self._prepare(game)
                     if pid and not warned:
                         warned = True
-                        self._say(appid, name, f"Comet - {name}", "Restart the game: Comet started before Cometa could set it up.", "mention")
+                        self._say(appid, name, f"Comet - {name}",
+                                  "Restart the game: Comet started before Cometa could set it up.", "mention")
                 with self._lock:
                     if cancel.is_set():
                         return
@@ -215,4 +204,4 @@ class Comet(Endpoint):
         if self._stop.is_set() or self._current != appid:
             return
         self.host.log.info("%s: %s", title, body)
-        self.host.announce(self, title, body, logo(appid), sound=sound)
+        self.host.announce(self, title, body, logo(self.host.logos(appid)), sound=sound)

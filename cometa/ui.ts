@@ -164,7 +164,10 @@ function paintAchievements() {
         ? [ui.info(`${name}: no achievements yet. Comet keeps them once the game has run with it.`)]
         : result.dbs.length === 1 // one database: no need to group them
           ? [ui.info(result.dbs[0].error ? name : `${name} — ${summary(result.dbs[0])}`), ...rows(result.dbs[0])]
-          : [ui.info(name), ...result.dbs.map((db) => ui.section(db.error ? db.client_id : `${db.client_id} — ${summary(db)}`, rows(db)))]),
+          : [
+              ui.info(name),
+              ...result.dbs.map((db) => ui.section(db.error ? db.client_id : `${db.client_id} — ${summary(db)}`, rows(db))),
+            ]),
   );
 }
 
