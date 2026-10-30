@@ -38,9 +38,21 @@ class Host:
         except (self.ctx.InvalidArgument, self.ctx.Unavailable):
             return []
 
+    def logo(self, appid):
+        """The game's logo as a data: URI, or "" if it has none that fits."""
+        return endpoints_mod.logo(self.logos(appid))
+
+    def is_gog(self, appid):
+        """Whether the game is a GOG one, so it runs Comet: a shortcut whose .bat says set "STORE=gog"."""
+        return games.is_gog_launcher(self.ctx.game.shortcut_exe(appid))
+
     @property
     def port(self):
         return server.port if server else None
+
+    def url(self, path):
+        """Where the service takes POSTs to path."""
+        return f"http://{service.HOST}:{self.port}{path}"
 
     def announce(self, endpoint, title, body="", icon="", sound=""):
         """A message of the endpoint itself, with its image unless there's a better icon (or
@@ -55,8 +67,9 @@ class Host:
             self.log.warning("%s: message not shown: %s", endpoint.name, e)
 
 
-def _on(endpoint):
-    return bool(ctx.settings.get(f"endpoint_{endpoint.name}"))
+def _on(name):
+    """Whether the endpoint's switch is on (read on every request)."""
+    return bool(ctx.settings.get(f"endpoint_{name}"))
 
 
 def _icon_for(name):
@@ -91,7 +104,7 @@ def _start():
             return
         port = ctx.settings.get("port")
         s = service.CometaServer(port, ctx.notify, ctx.log, endpoints=eps.values(), unavailable=(ctx.Unavailable,),
-                               endpoint_on=lambda name: ctx.settings.get(f"endpoint_{name}"),
+                               endpoint_on=_on,
                                quiet=lambda: ctx.settings.get("dnd"), default_icon=_icon_for)
         try:
             s.start()
@@ -102,7 +115,7 @@ def _start():
         server = s
         ctx.log.info("listening on http://127.0.0.1:%s", port)
         for ep in eps.values():
-            if _on(ep):
+            if _on(ep.name):
                 _safely(ep.start, host)
 
 
@@ -153,8 +166,8 @@ def status():
     port = ctx.settings.get("port")
     base = f"http://127.0.0.1:{port}"
     running = server is not None
-    listed = [{"name": ep.name, "path": ep.path, "url": base + ep.path, "on": _on(ep),
-               "details": ep.details() if running and _on(ep) else []} for ep in eps.values()]
+    listed = [{"name": ep.name, "path": ep.path, "url": base + ep.path, "on": _on(ep.name),
+               "details": ep.details() if running and _on(ep.name) else []} for ep in eps.values()]
     return {"enabled": ctx.settings.get("enabled"), "running": running, "port": port,
             "url": base, "error": error, "dnd": ctx.settings.get("dnd"), "endpoints": listed}
 
@@ -175,8 +188,7 @@ def test():
 
 
 def is_gog(appid):
-    """Whether the game is a GOG one, so it runs Comet: a shortcut whose .bat says set "STORE=gog"."""
-    return games.is_gog_launcher(ctx.game.shortcut_exe(appid))
+    return host.is_gog(appid)
 
 
 def achievements(appid):
@@ -184,7 +196,7 @@ def achievements(appid):
     game."""
     if not is_gog(appid):
         return {"gog": False}
-    return {"gog": True, "dbs": [achievements_mod.read(db) for db in games.gameplay_dbs(ctx.paths.compatdata(appid))]}
+    return {"gog": True, "dbs": [achievements_mod.read(db) for db in games.gameplay_dbs(host.prefix(appid))]}
 
 
 METHODS = {"status": status, "recent": recent, "test": test, "achievements": achievements, "is_gog": is_gog}

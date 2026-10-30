@@ -9,7 +9,7 @@ Cometa listens on **127.0.0.1** only (port 33812 by default; turn the service of
 | `/cometa` | The `custom_event` Comet itself POSTs: `{"name": "achievement_unlocked", "client_id", "data": {…achievement…}}`. Needs a Comet with `custom_event`. |
 | `/cometa/db` | The old, alternative method, off by default: the unlocked achievement as a flat JSON object, sent by Comety from Comet's database. |
 
-The notification takes the achievement's `name` as the title, its `description` and `rarity` as the body and `image_url_unlocked` as the icon, with Steam's trophy sound. Only an achievement unlocked in the last 5 minutes is shown; anything else is answered `ignored`.
+The notification takes the achievement's `name` as the title, its `description` and `rarity` as the body and `image_url_unlocked` as the icon, with Steam's trophy sound. An achievement from `/cometa` is always shown: Comet sends it only for a new unlock, and its date is the game's, which stands still while the machine sleeps. From `/cometa/db`, only an achievement unlocked in the last 5 minutes is shown; anything else is answered `ignored`.
 
 When a GOG game (a Steam shortcut whose `.bat` has `set "STORE=gog"`, as [Rakun](https://github.com/FranjeGueje/rakun) writes it) is selected or starts, Cometa writes this block in Comet's `config.toml` of the game's prefix, keeping the rest of the file:
 
@@ -50,6 +50,10 @@ python3 ../invasor/tools/install_module.py cometa    # or install that zip from 
 ```
 
 ## Changes
+
+### 0.2.1
+- `/cometa` shows every achievement Comet sends, however old its date. An achievement unlocked after suspending the machine with the game open wasn't shown: the game's clock stands still while it sleeps, so it looked old.
+- `/cometa/db` logs each old unlock it ignores, with its age.
 
 ### 0.2.0
 - A GOG game in another library (an SD card, a USB drive) is found too: its Comet config, its databases and its achievements. Before, only the main library was looked at.

@@ -1,8 +1,8 @@
 """/cometa: the achievements Comet itself sends (its custom_event setting).
 
 Unlike /cometa/db, nothing is read from Comet's database: Comet POSTs each unlock here as
-{"name": "achievement_unlocked", "client_id": "…", "data": {…the achievement…}}. Both can be on at once; an
-achievement then shows twice.
+{"name": "achievement_unlocked", "client_id": "…", "data": {…the achievement…}}, and only for a new unlock, so it is
+shown however old its date is. Both can be on at once; an achievement then shows twice.
 
 While this endpoint is on, Cometa follows the games of Invasor (game_selected / game_started / game_stopped). A game that is
 a shortcut whose .bat says set "STORE=gog" will run Comet, so as soon as it is selected Cometa puts the [[custom_event]]
@@ -12,7 +12,7 @@ checks every few seconds that the config has that URL, that comet.exe is running
 import threading
 
 from . import comet_config, games, service
-from .endpoints import Endpoint, just_unlocked, logo, trophy
+from .endpoints import Endpoint, trophy
 
 EVENT = "achievement_unlocked"
 WATCH_WAIT = 5.0   # seconds between checks
@@ -34,7 +34,9 @@ class Comet(Endpoint):
         self._state = ""
 
     def adapt(self, data):
-        """Lenient, like /cometa/db. Any other event, and an unlock that is not recent, is ignored (None)."""
+        """Lenient, like /cometa/db. Any other event is ignored (None). An unlock is shown however old its date_unlocked:
+        Comet sends this event only for a new one, and the date is the game's, which stands still while the machine
+        sleeps (an achievement unlocked after a suspend looks as old as the sleep was long)."""
         if data.get("name") != EVENT:
             return None
         achievement = data.get("data")
@@ -42,8 +44,6 @@ class Comet(Endpoint):
             raise service.Rejected(400, "data is required")
         if not isinstance(achievement.get("name"), str):
             raise service.Rejected(400, "data.name is required")
-        if not just_unlocked(achievement.get("date_unlocked")):
-            return None
         return trophy(achievement["name"], achievement.get("description"), achievement.get("rarity"),
                       achievement.get("image_url_unlocked"))
 
@@ -83,7 +83,7 @@ class Comet(Endpoint):
     # -- the config of Comet --
 
     def _url(self):
-        return f"http://127.0.0.1:{self.host.port}{self.path}"
+        return self.host.url(self.path)
 
     def _prepare(self, game):
         """If the game will run Comet, put Cometa's custom event in its config. Returns the config's path, or None if the
@@ -92,7 +92,7 @@ class Comet(Endpoint):
             appid = game.get("appid")
             if appid is None or not game.get("shortcut") or self.host.port is None:
                 return None
-            if not games.is_gog_launcher(self.host.ctx.game.shortcut_exe(appid)):
+            if not self.host.is_gog(appid):
                 return None
             path = str(games.comet_config(self.host.prefix(appid)))
             if comet_config.ensure_block(path, self._url()):
@@ -204,4 +204,4 @@ class Comet(Endpoint):
         if self._stop.is_set() or self._current != appid:
             return
         self.host.log.info("%s: %s", title, body)
-        self.host.announce(self, title, body, logo(self.host.logos(appid)), sound=sound)
+        self.host.announce(self, title, body, self.host.logo(appid), sound=sound)

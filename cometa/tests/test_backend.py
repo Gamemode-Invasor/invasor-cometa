@@ -380,12 +380,14 @@ class Comet(unittest.TestCase):
         self.gog.WATCH_WAIT = 0.01
         self.gog.WATCH_TRIES = 3
         self.gog.games = mock.Mock(COMET_PORT=9977, comet_config=mock.Mock(return_value=self.config),
-                                   is_gog_launcher=mock.Mock(return_value=True),
                                    comet_pid=mock.Mock(return_value=None),
                                    comet_others=mock.Mock(return_value=[]),
                                    port_owned_by=mock.Mock(return_value=False),
                                    port_listening=mock.Mock(return_value=False))
-        self.gog.logo = mock.Mock(return_value="")
+        # Asked through the Host (backend.py)
+        self.is_gog = mock.patch.object(submodule(self.b, "games"), "is_gog_launcher", return_value=True).start()
+        mock.patch.object(self.b.Host, "logo", return_value="").start()
+        self.addCleanup(mock.patch.stopall)
         self.ctx = FakeCtx(free_port())
         self.ctx.game.shortcut_exe = mock.Mock(return_value="/runner/Blade.bat")
         self.ctx.settings.values["endpoint_comet_db"] = False  # only GOG Comet
@@ -411,7 +413,7 @@ class Comet(unittest.TestCase):
         self.ctx.game.shortcut_exe.assert_called_with("123")
 
     def test_other_games_are_left_alone(self):
-        self.gog.games.is_gog_launcher.return_value = False
+        self.is_gog.return_value = False
         self.ctx.events.emit("game_selected", self.GAME)  # a shortcut that isn't from GOG
         self.ctx.events.emit("game_selected", {"appid": "9", "name": "Steam game", "shortcut": False})
         self.assertFalse(os.path.exists(self.config))
@@ -471,7 +473,7 @@ class Comet(unittest.TestCase):
         self.assertEqual(self.ctx.shown, [])
 
     def test_a_game_that_is_not_gog_is_not_watched(self):
-        self.gog.games.is_gog_launcher.return_value = False
+        self.is_gog.return_value = False
         self.gog.games.comet_pid.return_value = 4321
         self.gog.games.port_owned_by.return_value = True
         self.ctx.events.emit("game_started", self.GAME)
@@ -532,7 +534,7 @@ class Comet(unittest.TestCase):
         self.assertEqual(self.ctx.shown, [])
 
     def test_the_port_of_a_game_that_is_not_gog_is_nobody_s_business(self):
-        self.gog.games.is_gog_launcher.return_value = False
+        self.is_gog.return_value = False
         self.gog.games.port_listening.return_value = True
         self.ctx.events.emit("game_started", self.GAME)
         time.sleep(0.1)

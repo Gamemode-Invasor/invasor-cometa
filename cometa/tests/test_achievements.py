@@ -87,6 +87,7 @@ class Backend(unittest.TestCase):
     def test_a_game_that_is_not_gog(self):
         b = load_backend()
         b.ctx = mock.Mock()
+        b.host = b.Host(b.ctx)
         b.ctx.game.shortcut_exe.return_value = None
         self.assertEqual(b.achievements("123"), {"gog": False})
         self.assertFalse(b.is_gog("123"))
@@ -94,6 +95,7 @@ class Backend(unittest.TestCase):
     def test_a_gog_game_with_its_databases(self):
         b = load_backend()
         b.ctx = mock.Mock()
+        b.host = b.Host(b.ctx)
         games = submodule(b, "games")
         with mock.patch.object(games, "is_gog_launcher", return_value=True), \
                 mock.patch.object(games, "gameplay_dbs", return_value=[]) as dbs:

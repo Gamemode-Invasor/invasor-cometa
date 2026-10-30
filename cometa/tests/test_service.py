@@ -269,13 +269,17 @@ class Comet(Server):
         self.assertEqual(self.post(payload)[0], 200)
         self.assertEqual(self.sent[0], ("Necromancer", "", ""))
 
-    def test_other_events_and_old_unlocks_are_ignored(self):
+    def test_other_events_are_ignored(self):
         ignored = (200, {"ok": True, "shown": False, "reason": "ignored"})
         self.assertEqual(self.post({**comet_payload(), "name": "something_else"}), ignored)
-        for date in (None, "", "garbage", now_utc(3600).replace("+0000", "+00:00"), "2026-07-31T01:48:51+0000"):
-            with self.subTest(date=date):
-                self.assertEqual(self.post(comet_payload(date_unlocked=date)), ignored)
         self.assertEqual((self.sent, list(self.s.recent)), ([], []))
+
+    def test_an_unlock_is_shown_whatever_its_date(self):
+        # The date is the game's: after a suspend it is as old as the sleep was long.
+        for date in (None, "", "garbage", now_utc(6800).replace("+0000", "+00:00"), "2026-07-31T01:48:51+0000"):
+            with self.subTest(date=date):
+                self.assertEqual(self.post(comet_payload(date_unlocked=date)), (200, {"ok": True, "shown": True}))
+        self.assertEqual(len(self.sent), 5)
 
     def test_the_achievement_is_required(self):
         for bad in ({"name": "achievement_unlocked"}, {"name": "achievement_unlocked", "data": []},
