@@ -13,7 +13,7 @@ from . import service
 from .achievements import https_url
 
 ASSETS = Path(__file__).resolve().parent / "assets"
-MAX_UNLOCK_AGE = 300  # seconds: an older unlock is Comet syncing what you had, not something new
+MAX_UNLOCK_AGE = 300  # seconds, /cometa/db only: an older unlock is Comet syncing what you had, not something new
 
 
 @lru_cache(maxsize=None)
@@ -25,14 +25,16 @@ def default_icon():
         return ""
 
 
-def just_unlocked(unlock_time):
-    """Whether Comet's unlock_time ("2026-07-31T01:48:51+0000") is recent. Comety sends every
-    update of an achievement, including a new database being filled with what you already had."""
+def unlock_age(unlock_time):
+    """How long ago (seconds) Comet's unlock_time ("2026-07-31T01:48:51+0000") was, or None if it isn't one.
+    /cometa/db checks it, as Comety sends every update of an achievement, including a new database being filled
+    with what you already had. /cometa doesn't: its time is the game's, which stands still while the machine
+    sleeps, and Comet sends that event only for a new unlock."""
     try:
         when = datetime.strptime(unlock_time, "%Y-%m-%dT%H:%M:%S%z")
     except (TypeError, ValueError):
-        return False
-    return (datetime.now(timezone.utc) - when).total_seconds() <= MAX_UNLOCK_AGE
+        return None
+    return (datetime.now(timezone.utc) - when).total_seconds()
 
 
 def logo(files):

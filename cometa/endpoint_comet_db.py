@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 
 from . import games, service
-from .endpoints import Endpoint, just_unlocked, logo, trophy
+from .endpoints import MAX_UNLOCK_AGE, Endpoint, trophy, unlock_age
 
 COMETY_BIN = Path(__file__).resolve().parent / "bin" / "comety"
 # After a game starts, look for its databases (Comet creates them late): the first time after
@@ -38,7 +38,12 @@ class CometDb(Endpoint):
         update (not unlocked, unlocked long ago) is ignored (None)."""
         if not isinstance(data.get("name"), str):
             raise service.Rejected(400, "name is required")
-        if not just_unlocked(data.get("unlock_time")):
+        age = unlock_age(data.get("unlock_time"))
+        if age is None:
+            return None  # not unlocked
+        if age > MAX_UNLOCK_AGE:
+            if self.host:
+                self.host.log.info("comet_db: %s ignored, unlocked %d s ago", data["name"], age)
             return None
         return trophy(data["name"], data.get("description"), data.get("rarity"), data.get("image_url_unlocked"))
 
@@ -96,7 +101,7 @@ class CometDb(Endpoint):
             try:
                 os.chmod(COMETY_BIN, 0o755)  # the installer doesn't keep the executable bit
                 self.comety[db] = subprocess.Popen(
-                    [str(COMETY_BIN), "--url", f"http://127.0.0.1:{self.host.port}{self.path}", "--quiet", db],
+                    [str(COMETY_BIN), "--url", self.host.url(self.path), "--quiet", db],
                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError as e:
                 self.host.log.warning("can't run comety: %s", e.strerror or e)
@@ -115,7 +120,7 @@ class CometDb(Endpoint):
             if first:
                 self.game = (appid, name)
                 self.host.announce(self, f"Comet - {name}", f"Cometa is connecting to {name}",
-                                   logo(self.host.logos(appid)), sound="online")
+                                   self.host.logo(appid), sound="online")
 
     def _leave(self):
         """The game is over (or the endpoint is turned off): stop its comety and say so."""
@@ -125,7 +130,7 @@ class CometDb(Endpoint):
             self.comety.clear()
             if game:
                 self.host.announce(self, f"Comet - {game[1]}", f"Cometa disconnected from {game[1]}",
-                                   logo(self.host.logos(game[0])), sound="mention")
+                                   self.host.logo(game[0]), sound="mention")
 
     # -- the game being played --
 
